@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+
 # Kommuneskat og institutionsbetaling (forkortet eksempel)
 kommuneskat_liste = {
     "København": 23.50, "Frederiksberg": 24.57, "Aarhus": 24.52
