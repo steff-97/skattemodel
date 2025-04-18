@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-
+import matplotlib.pyplot as plt
 # Kommuneskat og institutionsbetaling (forkortet eksempel)
 kommuneskat_liste = {
     "København": 23.50, "Frederiksberg": 24.57, "Aarhus": 24.52
@@ -172,3 +172,58 @@ if st.button("Beregn skat og tilskud"):
         st.write(f"Boligsikring: {boligsikring_beløb:,.0f} kr")
         st.write(f"Kørselsfradrag: {kørselsfradrag:,.0f} kr")
         st.write(f"Besparelse i skat pga. kørselsfradrag: {kørselsfradrag * kommuneskat_pct:,.0f} kr")
+
+# Tilføj graf over marginalskat og effektiv skat
+
+
+if st.button("Vis marginal- og effektiv skat over indkomstniveauer"):
+    indkomster = np.arange(100000, 1000000, 1000)
+    effektiv_skat_liste = []
+    marginal_skat_liste = []
+
+    sidste_netto = None
+    for indkomst in indkomster:
+        su_b = su(indkomst, su_check)
+        børne_b = børne_unge_tilskud(indkomst, børn)
+        boligst_b = boligstøtte(indkomst, True)
+        friplads_b = friplads_tilskud(indkomst, børn, kommune, er_enlig)
+        boligsikr_b = boligsikring(indkomst, boligudgift, antal_børn, any(b['alder'] < 18 for b in børn)) if lejebolig else 0
+
+        am_b = indkomst * am_bidrag_pct
+        besk_f = min(beskæftigelsesfradrag_pct * indkomst, beskæftigelsesfradrag_maks)
+        job_f = min(jobfradrag_pct * max(0, indkomst - jobfradrag_bundgrænse), jobfradrag_maks)
+        enlig_f = min(indkomst * enlig_forsorger_fradrag_pct, enlig_forsorger_fradrag_maks) if er_enlig else 0
+        kørsels_f = beregn_kørselsfradrag(afstand_km, antal_dage, yderkommune, brovalg)
+        ligning_f = besk_f + job_f + enlig_f + kørsels_f
+
+        skattepligtig_indk = max(0, indkomst - am_b - personfradrag)
+        bundskat = skattepligtig_indk * bundskat_pct
+        topskat = max(0, (skattepligtig_indk - (topskat_grænse - personfradrag)) * topskat_pct)
+        komm_skat = max(0, (skattepligtig_indk - ligning_f) * kommuneskat_pct)
+        total_skat = am_b + bundskat + topskat + komm_skat
+
+        total_tilskud = su_b + børne_b + boligst_b + friplads_b + boligsikr_b
+        brutto = indkomst + total_tilskud
+        netto = brutto - total_skat
+
+        effektiv_skat = total_skat / brutto * 100 if brutto > 0 else 0
+        effektiv_skat_liste.append(effektiv_skat)
+
+        if sidste_netto is not None:
+            marginal_skat = 100 - ((netto - sidste_netto) / 10000 * 100)
+            marginal_skat_liste.append(marginal_skat)
+        else:
+            marginal_skat_liste.append(0)
+
+        sidste_netto = netto
+
+    fig, ax = plt.subplots()
+    ax.plot(indkomster, effektiv_skat_liste, label="Effektiv skat (%)")
+    ax.plot(indkomster, marginal_skat_liste, label="Marginalskat (%)")
+    ax.set_title("Effektiv og marginalskat i forhold til indkomst")
+    ax.set_xlabel("Indkomst (kr)")
+    ax.set_ylabel("Skatteprocent")
+    ax.legend()
+    ax.grid(True)
+    st.pyplot(fig)
+
