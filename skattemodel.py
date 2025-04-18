@@ -101,30 +101,36 @@ def boligsikring(indkomst, boligudgift, antal_børn, har_børn_under_18=True):
 
 # Streamlit app
 
-st.set_page_config(page_title="Dansk Skattemodel 2025", layout="wide")
-st.title("🇩🇰 Dansk Skattemodel 2025")
+# 🏡 Samlet inputsektion
+st.header("🧾 Oplysninger om din husstand og indkomst")
 
+# Kommune og indkomst
 kommune = st.selectbox("Vælg din kommune", sorted(kommuneskat_liste.keys()))
 kommuneskat_pct = kommuneskat_liste[kommune] / 100
 løn = st.number_input("Indtast din årlige løn", value=450000)
 su_check = st.checkbox("Modtager du SU?")
+
+# Bolig
 lejebolig = st.checkbox("Bor du i lejebolig?")
 boligudgift = st.number_input("Din årlige boligudgift", value=60000) if lejebolig else 0
+
+# Børn og civilstand
 antal_børn = st.number_input("Antal børn", min_value=0, step=1)
 børn_aldre = [st.slider(f"Alder på barn {i+1}", 0, 17, 4) for i in range(antal_børn)]
 er_enlig = st.checkbox("Er du enlig forsørger?")
 
-# Transport
-st.write("### Transport og kørselsfradrag")
+# 🚗 Transport og kørselsfradrag (integreret i samme sektion)
 afstand_km = st.number_input("Hvor mange km er der til arbejde (én vej)?", value=0)
 antal_dage = st.number_input("Hvor mange dage om året kører du til arbejde?", value=216)
 yderkommune = st.checkbox("Bor du i en yderkommune eller på en småø?")
+
 brovalg = {
     'storebælt_bil': st.number_input("Antal årlige ture over Storebælt (bil)", value=0),
     'storebælt_tog': st.number_input("Antal årlige ture over Storebælt (tog)", value=0),
     'øresund_bil': st.number_input("Antal årlige ture over Øresund (bil)", value=0),
     'øresund_tog': st.number_input("Antal årlige ture over Øresund (tog)", value=0)
 }
+
 
 if st.button("Beregn skat og tilskud"):
     børn = [{'alder': a} for a in børn_aldre]
