@@ -27,7 +27,30 @@ jobfradrag_maks = 2900
 enlig_forsorger_fradrag_pct = 0.115
 enlig_forsorger_fradrag_maks = 48300
 
+# Kørselsfradrag
+
+def beregn_kørselsfradrag(afstand_km, antal_dage, yderkommune=False, bro_ture=None):
+    fradrag = 0
+    daglig_returtur = afstand_km * 2
+    for km in range(25, min(121, int(daglig_returtur)) + 1):
+        fradrag += (2.47 if yderkommune else 2.23) * antal_dage
+    for km in range(121, int(daglig_returtur) + 1):
+        fradrag += (2.47 if yderkommune else 1.12) * antal_dage
+
+    bro_fradrag = {
+        'storebælt_bil': 110,
+        'storebælt_tog': 15,
+        'øresund_bil': 50,
+        'øresund_tog': 8,
+    }
+    if bro_ture:
+        for bro, antal in bro_ture.items():
+            fradrag += bro_fradrag.get(bro, 0) * antal
+
+    return fradrag
+
 # Beregn ydelser og tilskud
+
 def su(indkomst, modtager_su):
     return 80000 if modtager_su and indkomst < 350000 else 60000 if modtager_su else 0
 
@@ -76,6 +99,8 @@ def boligsikring(indkomst, boligudgift, antal_børn, har_børn_under_18=True):
         return 0
     return round(tilskud / 12) * 12
 
+# Streamlit app
+
 st.set_page_config(page_title="Dansk Skattemodel 2025", layout="wide")
 st.title("🇩🇰 Dansk Skattemodel 2025")
 
@@ -89,6 +114,18 @@ antal_børn = st.number_input("Antal børn", min_value=0, step=1)
 børn_aldre = [st.slider(f"Alder på barn {i+1}", 0, 17, 4) for i in range(antal_børn)]
 er_enlig = st.checkbox("Er du enlig forsørger?")
 
+# Transport
+st.write("### Transport og kørselsfradrag")
+afstand_km = st.number_input("Hvor mange km er der til arbejde (én vej)?", value=0)
+antal_dage = st.number_input("Hvor mange dage om året kører du til arbejde?", value=216)
+yderkommune = st.checkbox("Bor du i en yderkommune eller på en småø?")
+brovalg = {
+    'storebælt_bil': st.number_input("Antal årlige ture over Storebælt (bil)", value=0),
+    'storebælt_tog': st.number_input("Antal årlige ture over Storebælt (tog)", value=0),
+    'øresund_bil': st.number_input("Antal årlige ture over Øresund (bil)", value=0),
+    'øresund_tog': st.number_input("Antal årlige ture over Øresund (tog)", value=0)
+}
+
 if st.button("Beregn skat og tilskud"):
     børn = [{'alder': a} for a in børn_aldre]
     su_beløb = su(løn, su_check)
@@ -96,13 +133,14 @@ if st.button("Beregn skat og tilskud"):
     boligstøtte_beløb = boligstøtte(løn, True)
     friplads = friplads_tilskud(løn, børn, kommune, er_enlig)
     boligsikring_beløb = boligsikring(løn, boligudgift, antal_børn, any(b['alder'] < 18 for b in børn)) if lejebolig else 0
+    kørselsfradrag = beregn_kørselsfradrag(afstand_km, antal_dage, yderkommune, brovalg)
 
     # Skat
     am_bidrag = løn * am_bidrag_pct
     besk_fradrag = min(beskæftigelsesfradrag_pct * løn, beskæftigelsesfradrag_maks)
     jobfradrag = min(jobfradrag_pct * max(0, løn - jobfradrag_bundgrænse), jobfradrag_maks)
     enlig_fradrag = min(løn * enlig_forsorger_fradrag_pct, enlig_forsorger_fradrag_maks) if er_enlig else 0
-    ligning_fradrag = besk_fradrag + jobfradrag + enlig_fradrag
+    ligning_fradrag = besk_fradrag + jobfradrag + enlig_fradrag + kørselsfradrag
     skattepligtig = max(0, løn - am_bidrag - personfradrag)
     bundskat = skattepligtig * bundskat_pct
     topskat = max(0, (skattepligtig - (topskat_grænse - personfradrag)) * topskat_pct)
@@ -126,3 +164,5 @@ if st.button("Beregn skat og tilskud"):
         st.write(f"Friplads: {friplads:,.0f} kr")
         st.write(f"SU: {su_beløb:,.0f} kr")
         st.write(f"Boligsikring: {boligsikring_beløb:,.0f} kr")
+        st.write(f"Kørselsfradrag: {kørselsfradrag:,.0f} kr")
+        st.write(f"Besparelse i skat pga. kørselsfradrag: {kørselsfradrag * kommuneskat_pct:,.0f} kr")
